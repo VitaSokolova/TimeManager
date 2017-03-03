@@ -1,10 +1,6 @@
 package com.example.android.timemanager;
 
-import android.app.Activity;
-import android.content.ContentValues;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
@@ -26,9 +22,13 @@ import com.bignerdranch.android.multiselector.ModalMultiSelectorCallback;
 import com.bignerdranch.android.multiselector.MultiSelector;
 import com.bignerdranch.android.multiselector.SwappingHolder;
 
+import com.example.android.timemanager.logic.DBOpenHelper;
 import com.example.android.timemanager.logic.DateWorker;
 import com.example.android.timemanager.logic.WorkItem;
+import com.j256.ormlite.android.apptools.OpenHelperManager;
+import com.j256.ormlite.dao.Dao;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -49,8 +49,7 @@ public class PlusOneFragment extends Fragment {
     private Calendar start;
     private Calendar end;
 
-    DBOpenHelper mDbHelper;
-    SQLiteDatabase db;
+    private DBOpenHelper mDbHelper = null;
 
     private RecyclerView recyclerView;
     private WorkItemAdapter adapter;
@@ -75,32 +74,17 @@ public class PlusOneFragment extends Fragment {
 
                         WorkItem item = listWorkItems.get(i);
                         //TODO:удалить еще и из базы и вообще навсегда
-
-                        mDbHelper = new DBOpenHelper(getContext());
-                        db = mDbHelper.getReadableDatabase();
-                        db.beginTransaction();
-
-
-                        String whereClause = DBOpenHelper.DATE_YEAR + "=? and " + DBOpenHelper.DATE_MONTH + "=? and " + DBOpenHelper.DATE_DAY + "=? and "
-                                + DBOpenHelper.BEGINNING_HOUR + "=? and " + DBOpenHelper.BEGINNING_MINUTE + "=? and "
-                                + DBOpenHelper.ENDING_HOUR + "=? and " + DBOpenHelper.ENDING_MINUTE + "=?";
-
-                        String[] whereArgs = new String[]{String.valueOf(item.getStart().get(Calendar.YEAR)),
-                                String.valueOf(item.getStart().get(Calendar.MONTH)),
-                                String.valueOf(item.getStart().get(Calendar.DAY_OF_MONTH)),
-                                String.valueOf(item.getStart().get(Calendar.HOUR_OF_DAY)),
-                                String.valueOf(item.getStart().get(Calendar.MINUTE)),
-                                String.valueOf(item.getEnd().get(Calendar.HOUR_OF_DAY)),
-                                String.valueOf(item.getEnd().get(Calendar.MINUTE)),
-                        };
-                        db.delete(DBOpenHelper.TABLE_NAME, whereClause, whereArgs);
-                        db.setTransactionSuccessful();
-                        db.endTransaction();
-                        db.close();
-
-                        listWorkItems.remove(i);
-                        adapter.notifyItemRemoved(i);
-
+                        try {
+                            final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+                            //This is the way to insert data into a database table
+                            workItemDao.delete(item);
+                            listWorkItems.remove(i);
+                            adapter.notifyItemRemoved(i);
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                            //предупредим пользователя, что добавление не состоялось
+                            Toast.makeText(getContext(), R.string.warningAddFailed, Toast.LENGTH_SHORT).show();
+                        }
 
                     }
                 }
@@ -115,35 +99,10 @@ public class PlusOneFragment extends Fragment {
                     int index = indexes.get(0);
                     WorkItem item = listWorkItems.get(index);
 
-//                    mDbHelper = new DBOpenHelper(getContext());
-//                    db = mDbHelper.getReadableDatabase();
-//                    db.beginTransaction();
-//
-//
-//                    String whereClause = DBOpenHelper.DATE_YEAR + "=? and " + DBOpenHelper.DATE_MONTH + "=? and " + DBOpenHelper.DATE_DAY + "=? and "
-//                            + DBOpenHelper.BEGINNING_HOUR + "=? and " + DBOpenHelper.BEGINNING_MINUTE + "=? and "
-//                            + DBOpenHelper.ENDING_HOUR + "=? and " + DBOpenHelper.ENDING_MINUTE + "=?";
-//
-//                    String[] whereArgs = new String[]{String.valueOf(item.getStart().get(Calendar.YEAR)),
-//                            String.valueOf(item.getStart().get(Calendar.MONTH)),
-//                            String.valueOf(item.getStart().get(Calendar.DAY_OF_MONTH)),
-//                            String.valueOf(item.getStart().get(Calendar.HOUR_OF_DAY)),
-//                            String.valueOf(item.getStart().get(Calendar.MINUTE)),
-//                            String.valueOf(item.getEnd().get(Calendar.HOUR_OF_DAY)),
-//                            String.valueOf(item.getEnd().get(Calendar.MINUTE)),
-//                    };
-//                    db.delete(DBOpenHelper.TABLE_NAME, whereClause, whereArgs);
-//                    db.setTransactionSuccessful();
-//                    db.endTransaction();
-//                    db.close();
+                    // TODO закинуть в новую активити что надо
                     Intent intent = new Intent(getContext(), AddItemActivity.class);
-                    intent.putExtra(DBOpenHelper.BEGINNING_HOUR, String.valueOf(item.getStart().get(Calendar.HOUR_OF_DAY)));
-                    intent.putExtra(DBOpenHelper.BEGINNING_MINUTE, String.valueOf(item.getStart().get(Calendar.MINUTE)));
-                    intent.putExtra(DBOpenHelper.ENDING_HOUR, String.valueOf(item.getEnd().get(Calendar.HOUR_OF_DAY)));
-                    intent.putExtra(DBOpenHelper.ENDING_MINUTE, String.valueOf(item.getEnd().get(Calendar.MINUTE)));
-                    intent.putExtra(DBOpenHelper.DATE_YEAR, String.valueOf(item.getStart().get(Calendar.YEAR)));
-                    intent.putExtra(DBOpenHelper.DATE_MONTH, String.valueOf(item.getStart().get(Calendar.MONTH)));
-                    intent.putExtra(DBOpenHelper.DATE_DAY, String.valueOf(item.getStart().get(Calendar.DAY_OF_MONTH)));
+                    intent.putExtra(DBOpenHelper.BEGINNING, item.getStart());
+                    intent.putExtra(DBOpenHelper.ENDING, item.getEnd());
                     intent.putExtra(PlusOneFragment.POSITION, index);
 
                     startActivityForResult(intent, EDIT_ITEM_REQUEST_CODE);
@@ -199,7 +158,19 @@ public class PlusOneFragment extends Fragment {
             }
         });
 
-        getDataFromDB();
+        //TODO выбрать данные из БД
+        try {
+            final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+
+//            mDbHelper.onCreate(getHelper().getWritableDatabase());
+            listWorkItems = workItemDao.queryForAll();
+            adapter.notifyDataSetChanged();
+
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
 
         return view;
     }
@@ -210,126 +181,68 @@ public class PlusOneFragment extends Fragment {
             case ADD_ITEM_REQUEST_CODE:
                 if (resultCode == RESULT_OK) {
                     WorkItem item = (WorkItem) data.getSerializableExtra("item");
-                    listWorkItems.add(item);
-                    adapter.notifyItemInserted(adapter.getItemCount());
 
-                    DBOpenHelper dbOpenHelper = new DBOpenHelper(getActivity());
-                    SQLiteDatabase db = dbOpenHelper.getWritableDatabase();
-
-                    db.beginTransaction();
-                    ContentValues cv = new ContentValues();
-                    cv.put(DBOpenHelper.BEGINNING_HOUR, item.getStart().get(Calendar.HOUR_OF_DAY));
-                    cv.put(DBOpenHelper.BEGINNING_MINUTE, item.getStart().get(Calendar.MINUTE));
-                    cv.put(DBOpenHelper.ENDING_HOUR, item.getEnd().get(Calendar.HOUR_OF_DAY));
-                    cv.put(DBOpenHelper.ENDING_MINUTE, item.getEnd().get(Calendar.MINUTE));
-                    cv.put(DBOpenHelper.DATE_DAY, item.getStart().get(Calendar.DAY_OF_MONTH));
-                    cv.put(DBOpenHelper.DATE_MONTH, item.getStart().get(Calendar.MONTH));
-                    cv.put(DBOpenHelper.DATE_YEAR, item.getStart().get(Calendar.YEAR));
-                    db.insert(DBOpenHelper.TABLE_NAME, null, cv);
-                    db.setTransactionSuccessful();
-                    db.endTransaction();
-                    db.close();
+                    //TODO добавление в базу
+                    try {
+                        final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+                        //This is the way to insert data into a database table
+                        workItemDao.create(item);
+                        listWorkItems.add(item);
+                        adapter.notifyItemInserted(adapter.getItemCount());
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                        //предупредим пользователя, что добавление не состоялось
+                        Toast.makeText(getContext(), R.string.warningAddFailed, Toast.LENGTH_SHORT).show();
+                    }
 
                 }
                 break;
             case EDIT_ITEM_REQUEST_CODE:
                 if (resultCode == RESULT_OK) {
                     //новое состояние элемента
-                    WorkItem newItem = (WorkItem) data.getSerializableExtra("item");
+                    WorkItem item = (WorkItem) data.getSerializableExtra("item");
 
                     //получили индекс того элемента, который редактировали
                     int index = data.getIntExtra(PlusOneFragment.POSITION, 0);
 
-                    //сторое состояние этого элемента
-                    WorkItem oldItem = listWorkItems.get(index);
+                    listWorkItems.get(index).setStart(item.getStart());
+                    listWorkItems.get(index).setEnd(item.getEnd());
 
-                    DBOpenHelper dbOpenHelper = new DBOpenHelper(getActivity());
-                    SQLiteDatabase db = dbOpenHelper.getWritableDatabase();
+                    //TODO сделать изменение в базе
 
-                    db.beginTransaction();
-                    ContentValues cv = new ContentValues();
-                    cv.put(DBOpenHelper.BEGINNING_HOUR, newItem.getStart().get(Calendar.HOUR_OF_DAY));
-                    cv.put(DBOpenHelper.BEGINNING_MINUTE, newItem.getStart().get(Calendar.MINUTE));
-                    cv.put(DBOpenHelper.ENDING_HOUR, newItem.getEnd().get(Calendar.HOUR_OF_DAY));
-                    cv.put(DBOpenHelper.ENDING_MINUTE, newItem.getEnd().get(Calendar.MINUTE));
-                    cv.put(DBOpenHelper.DATE_DAY, newItem.getStart().get(Calendar.DAY_OF_MONTH));
-                    cv.put(DBOpenHelper.DATE_MONTH, newItem.getStart().get(Calendar.MONTH));
-                    cv.put(DBOpenHelper.DATE_YEAR, newItem.getStart().get(Calendar.YEAR));
-
-                    String whereClause = DBOpenHelper._ID + "= ?";
-
-                    String[] whereArgs = new String[]{String.valueOf(index + 1)};
-
-                    db.update(DBOpenHelper.TABLE_NAME, cv, whereClause, whereArgs);
-                    db.setTransactionSuccessful();
-                    db.endTransaction();
-                    db.close();
-
-                    listWorkItems.set(index, newItem);
-                    adapter.notifyItemChanged(index);
+                    try {
+                        final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+                        //This is the way to insert data into a database table
+                        workItemDao.update(listWorkItems.get(index));
+                        adapter.notifyItemChanged(index);
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                        //предупредим пользователя, что добавление не состоялось
+                        Toast.makeText(getContext(), R.string.warningEditFailed, Toast.LENGTH_SHORT).show();
+                    }
                 }
                 break;
         }
     }
 
-    private void getDataFromDB() {
-        mDbHelper = new DBOpenHelper(getContext());
-        db = mDbHelper.getReadableDatabase();
-// Define a projection that specifies which columns from the database
-// you will actually use after this query.
-        String[] projection = {
-                DBOpenHelper.BEGINNING_HOUR,
-                DBOpenHelper.BEGINNING_MINUTE,
-                DBOpenHelper.ENDING_HOUR,
-                DBOpenHelper.ENDING_MINUTE,
-                DBOpenHelper.DATE_DAY,
-                DBOpenHelper.DATE_MONTH,
-                DBOpenHelper.DATE_YEAR,
-        };
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
 
-// How you want the results sorted in the resulting Cursor
-//        String sortOrder =
-//                FeedEntry.COLUMN_NAME_UPDATED + " DESC";
-
-        Cursor c = db.query(
-                DBOpenHelper.TABLE_NAME,  // The table to query
-                projection,                               // The columns to return
-                null,                                // The columns for the WHERE clause
-                null,                            // The values for the WHERE clause
-                null,                                     // don't group the rows
-                null,                                     // don't filter by row groups
-                null                                // The sort order
-        );
-
-        if (c.moveToFirst()) {
-
-            do {
-                // получаем значения по номерам столбцов и пишем все в лог
-                Calendar startDate = Calendar.getInstance();
-                startDate.set(Calendar.YEAR, c.getInt(c.getColumnIndex(DBOpenHelper.DATE_YEAR)));
-                startDate.set(Calendar.MONTH, c.getInt(c.getColumnIndex(DBOpenHelper.DATE_MONTH)));
-                startDate.set(Calendar.DATE, c.getInt(c.getColumnIndex(DBOpenHelper.DATE_DAY)));
-                startDate.set(Calendar.HOUR_OF_DAY, c.getInt(c.getColumnIndex(DBOpenHelper.BEGINNING_HOUR)));
-                startDate.set(Calendar.MINUTE, c.getInt(c.getColumnIndex(DBOpenHelper.BEGINNING_MINUTE)));
-
-                Calendar finishDate = Calendar.getInstance();
-                finishDate.set(Calendar.YEAR, c.getInt(c.getColumnIndex(DBOpenHelper.DATE_YEAR)));
-                finishDate.set(Calendar.MONTH, c.getInt(c.getColumnIndex(DBOpenHelper.DATE_MONTH)));
-                finishDate.set(Calendar.DATE, c.getInt(c.getColumnIndex(DBOpenHelper.DATE_DAY)));
-                finishDate.set(Calendar.HOUR_OF_DAY, c.getInt(c.getColumnIndex(DBOpenHelper.ENDING_HOUR)));
-                finishDate.set(Calendar.MINUTE, c.getInt(c.getColumnIndex(DBOpenHelper.ENDING_MINUTE)));
-
-                listWorkItems.add(new WorkItem(startDate, finishDate));
-                adapter.notifyItemInserted(adapter.getItemCount());
-
-            } while (c.moveToNext());
-        } else {
-            c.close();
+        if (mDbHelper != null) {
+            OpenHelperManager.releaseHelper();
+            mDbHelper = null;
         }
-        // закрываем подключение к БД
-        mDbHelper.close();
-
     }
+
+    // так можно инициализировать mDBOpenHelper для использования в будущем
+    private DBOpenHelper getHelper() {
+        if (mDbHelper == null) {
+            mDbHelper = OpenHelperManager.getHelper(getContext(), DBOpenHelper.class);
+        }
+        return mDbHelper;
+    }
+
 
     private class WorkItemViewHolder extends SwappingHolder implements View.OnClickListener, View.OnLongClickListener {
 

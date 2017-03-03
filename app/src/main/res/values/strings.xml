@@ -15,4 +15,7 @@
     <string name="enter_price">Введите оплату за час в ₽:</string>
     <string name="alertGuestNameIsEmpty">Заполните поле</string>
     <string name="warningSelectOnlyOne">Выберите только одну запись для редактирования</string>
+    <string name="warningAddFailed">Не удалось добавить запись в базу данных</string>
+    <string name="warningDeleteFailed">Не удалось удалить запись из базы данных</string>
+    <string name="warningEditFailed">Не удалось отредактировать запись в базе данных</string>
 </resources>

@@ -9,18 +9,17 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.DatePicker;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.TimePicker;
 
+import com.example.android.timemanager.logic.DBOpenHelper;
 import com.example.android.timemanager.logic.DatePickerFragment;
 import com.example.android.timemanager.logic.DateWorker;
 import com.example.android.timemanager.logic.TimePickerFragment;
 import com.example.android.timemanager.logic.WorkItem;
 
 import java.util.Calendar;
-import java.util.Date;
 
 /**
  * Created by Комп on 21.02.2017.
@@ -84,19 +83,12 @@ public class AddItemActivity extends AppCompatActivity implements DatePickerDial
     private void initEditView(Intent intent) {
         this.addButton.setText(R.string.edit);
 
-        timeBeginning.set(Calendar.HOUR_OF_DAY, Integer.valueOf(intent.getStringExtra(DBOpenHelper.BEGINNING_HOUR)));
-        timeBeginning.set(Calendar.MINUTE, Integer.valueOf(intent.getStringExtra(DBOpenHelper.BEGINNING_MINUTE)));
+        long longTimeBeginning = intent.getLongExtra(DBOpenHelper.BEGINNING, 0);
+        long longTimeEnding = intent.getLongExtra(DBOpenHelper.ENDING, 0);
 
-        timeEnding.set(Calendar.HOUR_OF_DAY, Integer.valueOf(intent.getStringExtra(DBOpenHelper.ENDING_HOUR)));
-        timeEnding.set(Calendar.MINUTE, Integer.valueOf(intent.getStringExtra(DBOpenHelper.ENDING_MINUTE)));
+        timeBeginning.setTimeInMillis(longTimeBeginning);
+        timeEnding.setTimeInMillis(longTimeEnding);
 
-        timeBeginning.set(Calendar.YEAR, Integer.valueOf(intent.getStringExtra(DBOpenHelper.DATE_YEAR)));
-        timeBeginning.set(Calendar.MONTH, Integer.valueOf(intent.getStringExtra(DBOpenHelper.DATE_MONTH)));
-        timeBeginning.set(Calendar.DAY_OF_MONTH, Integer.valueOf(intent.getStringExtra(DBOpenHelper.DATE_DAY)));
-
-        timeEnding.set(Calendar.YEAR, Integer.valueOf(intent.getStringExtra(DBOpenHelper.DATE_YEAR)));
-        timeEnding.set(Calendar.MONTH, Integer.valueOf(intent.getStringExtra(DBOpenHelper.DATE_MONTH)));
-        timeEnding.set(Calendar.DAY_OF_MONTH, Integer.valueOf(intent.getStringExtra(DBOpenHelper.DATE_DAY)));
 
     }
 

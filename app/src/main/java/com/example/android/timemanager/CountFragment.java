@@ -110,15 +110,23 @@ public class CountFragment extends Fragment implements DatePickerDialog.OnDateSe
             public void onClick(View view) {
                 double sum = 0;
                 WorkItem item;
+
+                Calendar start = Calendar.getInstance();
+                Calendar end = Calendar.getInstance();
+
                 for (int i = 0; i < PlusOneFragment.listWorkItems.size(); i++) {
                     item = PlusOneFragment.listWorkItems.get(i);
-                    if ((item.getStart().after(dateBeginning)) && (item.getEnd().before(dateEnding))) {
-//                        float hours = item.getEnd().getTime().getTime() - item.getStart().getTime().getTime();
-                        float startHours = item.getStart().get(Calendar.HOUR_OF_DAY);
-                        float startMinutes = item.getStart().get(Calendar.MINUTE);
 
-                        float endHours = item.getEnd().get(Calendar.HOUR_OF_DAY);
-                        float endMinutes = item.getEnd().get(Calendar.MINUTE);
+                    start.setTimeInMillis(item.getStart());
+                    end.setTimeInMillis(item.getEnd());
+
+                    if ((start.after(dateBeginning)) && (end.before(dateEnding))) {
+//                        float hours = item.getEnd().getTime().getTime() - item.getStart().getTime().getTime();
+                        float startHours = start.get(Calendar.HOUR_OF_DAY);
+                        float startMinutes = start.get(Calendar.MINUTE);
+
+                        float endHours = end.get(Calendar.HOUR_OF_DAY);
+                        float endMinutes = end.get(Calendar.MINUTE);
                         float workingMinutes = endHours * 60 + endMinutes - startHours * 60 - startMinutes;
 
                         sum += ((pricePerHour/60.0) * workingMinutes);
