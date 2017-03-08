@@ -17,11 +17,11 @@ public class PagerAdapter extends FragmentPagerAdapter {
     public Fragment getItem(int position){
         switch (position){
             case 0:
-                return PlusOneFragment.newInstance();
+                return ItemsListFragment.newInstance();
             case 1:
                 return CountFragment.newInstance();
             default:
-                return PlusOneFragment.newInstance();
+                return ItemsListFragment.newInstance();
         }
     }
 

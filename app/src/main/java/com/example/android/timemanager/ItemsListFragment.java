@@ -1,8 +1,9 @@
 package com.example.android.timemanager;
 
 import android.content.Intent;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.AppCompatActivity;
@@ -36,10 +37,12 @@ import java.util.List;
 import static android.app.Activity.RESULT_OK;
 
 
-public class PlusOneFragment extends Fragment {
+public class ItemsListFragment extends Fragment {
 
     public static List<WorkItem> listWorkItems;
     public static final String POSITION = "POSITION";
+    public static final String SUCCEED = "SUCCEED";
+    public static final String INDEX = "INDEX";
 
     private static final int ADD_ITEM_REQUEST_CODE = 1;
     private static final int EDIT_ITEM_REQUEST_CODE = 2;
@@ -55,6 +58,40 @@ public class PlusOneFragment extends Fragment {
     private WorkItemAdapter adapter;
     private MultiSelector mMultiSelector = new MultiSelector();
     private ActionMode actionMode;
+    private Handler deletingHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            int index = msg.getData().getInt(INDEX);
+
+        }
+
+    };
+    private Handler edittingHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+
+            int index = msg.getData().getInt(INDEX);
+            adapter.notifyItemChanged(index);
+
+        }
+    };
+    private Handler addingHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+
+            int index = msg.getData().getInt(INDEX);
+            adapter.notifyItemInserted(index);
+
+        }
+    };
+    private Handler loadAllHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+
+            adapter.notifyDataSetChanged();
+
+        }
+    };
     private ModalMultiSelectorCallback mActionModeCallback = new ModalMultiSelectorCallback(mMultiSelector) {
         //открывается наше меню
         @Override
@@ -69,23 +106,39 @@ public class PlusOneFragment extends Fragment {
         public boolean onActionItemClicked(android.support.v7.view.ActionMode actionMode, MenuItem menuItem) {
             if (menuItem.getItemId() == R.id.action_delete) {
                 //проходимся по всему списку, если элемент присутствует в MultiSelector, удаляем его
-                for (int i = listWorkItems.size(); i >= 0; i--) {
+                for (int i = listWorkItems.size(); i >=0; i--) {
                     if (mMultiSelector.isSelected(i, 0)) {
 
-                        WorkItem item = listWorkItems.get(i);
-                        //TODO:удалить еще и из базы и вообще навсегда
-                        try {
-                            final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
-                            //This is the way to insert data into a database table
-                            workItemDao.delete(item);
-                            listWorkItems.remove(i);
-                            adapter.notifyItemRemoved(i);
-                        } catch (SQLException e) {
-                            e.printStackTrace();
-                            //предупредим пользователя, что добавление не состоялось
-                            Toast.makeText(getContext(), R.string.warningAddFailed, Toast.LENGTH_SHORT).show();
-                        }
+                        final WorkItem item = listWorkItems.get(i);
+//TODO:удалить еще и из базы и вообще навсегда
+                        final int finalI = i;
 
+                        Runnable runnable = new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+                                    workItemDao.delete(item);
+
+                                    Message msg = new Message();
+                                    Bundle bundle = new Bundle();
+                                    bundle.putInt(INDEX, finalI);
+                                    msg.setData(bundle);
+                                    //deletingHandler.sendMessage(msg);
+
+                                } catch (SQLException e) {
+                                    e.printStackTrace();
+                                    //предупредим пользователя, что добавление не состоялось
+                                    Toast.makeText(getContext(), R.string.warningAddFailed, Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        };
+
+                        Thread thread = new Thread(runnable);
+                        thread.start();
+
+                        listWorkItems.remove(i);
+                        adapter.notifyItemRemoved(i);
                     }
                 }
                 actionMode.finish();
@@ -103,13 +156,15 @@ public class PlusOneFragment extends Fragment {
                     Intent intent = new Intent(getContext(), AddItemActivity.class);
                     intent.putExtra(DBOpenHelper.BEGINNING, item.getStart());
                     intent.putExtra(DBOpenHelper.ENDING, item.getEnd());
-                    intent.putExtra(PlusOneFragment.POSITION, index);
+                    intent.putExtra(ItemsListFragment.POSITION, index);
 
                     startActivityForResult(intent, EDIT_ITEM_REQUEST_CODE);
 
                 } else {
                     Toast.makeText(getContext(), R.string.warningSelectOnlyOne, Toast.LENGTH_SHORT).show();
                 }
+
+
                 return true;
             }
             return false;
@@ -125,9 +180,9 @@ public class PlusOneFragment extends Fragment {
         }
     };
 
-    public static PlusOneFragment newInstance() {
+    public static ItemsListFragment newInstance() {
 
-        return new PlusOneFragment();
+        return new ItemsListFragment();
     }
 
     @Override
@@ -139,7 +194,7 @@ public class PlusOneFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
-        View view = inflater.inflate(R.layout.fragment_plus_one, container, false);
+        View view = inflater.inflate(R.layout.fragment_items_list, container, false);
 
         listWorkItems = new ArrayList<WorkItem>();
 
@@ -159,19 +214,24 @@ public class PlusOneFragment extends Fragment {
         });
 
         //TODO выбрать данные из БД
-        try {
-            final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+
+        Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
 
 //            mDbHelper.onCreate(getHelper().getWritableDatabase());
-            listWorkItems = workItemDao.queryForAll();
-            adapter.notifyDataSetChanged();
+                    listWorkItems = workItemDao.queryForAll();
+                } catch (SQLException e)
 
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-
+                {
+                    e.printStackTrace();
+                }
+            }
+        };
+        Thread thread = new Thread(runnable);
+        thread.start();
         return view;
     }
 
@@ -180,48 +240,72 @@ public class PlusOneFragment extends Fragment {
         switch (requestCode) {
             case ADD_ITEM_REQUEST_CODE:
                 if (resultCode == RESULT_OK) {
-                    WorkItem item = (WorkItem) data.getSerializableExtra("item");
+                    final WorkItem item = (WorkItem) data.getSerializableExtra("item");
 
                     //TODO добавление в базу
-                    try {
-                        final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
-                        //This is the way to insert data into a database table
-                        workItemDao.create(item);
-                        listWorkItems.add(item);
-                        adapter.notifyItemInserted(adapter.getItemCount());
-                    } catch (SQLException e) {
-                        e.printStackTrace();
-                        //предупредим пользователя, что добавление не состоялось
-                        Toast.makeText(getContext(), R.string.warningAddFailed, Toast.LENGTH_SHORT).show();
-                    }
+                    Runnable runnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+                                //This is the way to insert data into a database table
+                                workItemDao.create(item);
+                                listWorkItems.add(item);
 
+                                Message msg = new Message();
+                                Bundle bundle = new Bundle();
+                                bundle.putInt(INDEX, adapter.getItemCount());
+                                msg.setData(bundle);
+                                addingHandler.sendMessage(msg);
+
+                            } catch (SQLException e) {
+                                e.printStackTrace();
+                                //предупредим пользователя, что добавление не состоялось
+                                Toast.makeText(getContext(), R.string.warningAddFailed, Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    };
+
+                    Thread thread = new Thread(runnable);
+                    thread.start();
                 }
                 break;
             case EDIT_ITEM_REQUEST_CODE:
                 if (resultCode == RESULT_OK) {
-                    //новое состояние элемента
-                    WorkItem item = (WorkItem) data.getSerializableExtra("item");
+//новое состояние элемента
+                    final WorkItem item = (WorkItem) data.getSerializableExtra("item");
 
-                    //получили индекс того элемента, который редактировали
-                    int index = data.getIntExtra(PlusOneFragment.POSITION, 0);
-
-                    listWorkItems.get(index).setStart(item.getStart());
-                    listWorkItems.get(index).setEnd(item.getEnd());
+//получили индекс того элемента, который редактировали
+                    final int index = data.getIntExtra(ItemsListFragment.POSITION, 0);
 
                     //TODO сделать изменение в базе
+                    Runnable runnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+                                workItemDao.update(listWorkItems.get(index));
+                                Message msg = new Message();
+                                Bundle bundle = new Bundle();
+                                bundle.putInt(INDEX, index);
+                                msg.setData(bundle);
+                                edittingHandler.sendMessage(msg);
 
-                    try {
-                        final Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
-                        //This is the way to insert data into a database table
-                        workItemDao.update(listWorkItems.get(index));
-                        adapter.notifyItemChanged(index);
-                    } catch (SQLException e) {
-                        e.printStackTrace();
-                        //предупредим пользователя, что добавление не состоялось
-                        Toast.makeText(getContext(), R.string.warningEditFailed, Toast.LENGTH_SHORT).show();
-                    }
+                                listWorkItems.get(index).setStart(item.getStart());
+                                listWorkItems.get(index).setEnd(item.getEnd());
+
+                            } catch (SQLException e) {
+                                e.printStackTrace();
+                                //предупредим пользователя, что добавление не состоялось
+                                Toast.makeText(getContext(), R.string.warningEditFailed, Toast.LENGTH_SHORT).show();
+                            }
+                        }
+
+                    };
+                    Thread thread = new Thread(runnable);
+                    thread.start();
+                    break;
                 }
-                break;
         }
     }
 
@@ -235,7 +319,8 @@ public class PlusOneFragment extends Fragment {
         }
     }
 
-    // так можно инициализировать mDBOpenHelper для использования в будущем
+// так можно инициализировать mDBOpenHelper для использования в будущем
+
     private DBOpenHelper getHelper() {
         if (mDbHelper == null) {
             mDbHelper = OpenHelperManager.getHelper(getContext(), DBOpenHelper.class);

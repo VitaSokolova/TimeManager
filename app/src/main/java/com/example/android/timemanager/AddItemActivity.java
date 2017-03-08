@@ -61,7 +61,7 @@ public class AddItemActivity extends AppCompatActivity implements DatePickerDial
             public void onClick(View view) {
                 Intent intent = new Intent();
                 intent.putExtra("item", new WorkItem(timeBeginning, timeEnding));
-                intent.putExtra(PlusOneFragment.POSITION, index);
+                intent.putExtra(ItemsListFragment.POSITION, index);
                 setResult(RESULT_OK, intent);
                 finish();
             }
@@ -71,7 +71,7 @@ public class AddItemActivity extends AppCompatActivity implements DatePickerDial
         //если есть какие-то вложения, значит активити вызывалось для редактирования элемента
         if (intent.getExtras() != null) {
             initEditView(intent);
-            index = intent.getIntExtra(PlusOneFragment.POSITION, 0);
+            index = intent.getIntExtra(ItemsListFragment.POSITION, 0);
 
         }
 
