@@ -39,6 +39,7 @@ import static android.app.Activity.RESULT_OK;
 
 public class ItemsListFragment extends Fragment {
 
+    private static final String DELETINGINDEXESLIST = "DELETINGLIST";
     public static List<WorkItem> listWorkItems;
     public static final String POSITION = "POSITION";
     public static final String SUCCEED = "SUCCEED";
@@ -61,7 +62,7 @@ public class ItemsListFragment extends Fragment {
     private Handler deletingHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
-            int index = msg.getData().getInt(INDEX);
+          adapter.notifyDataSetChanged();
 
         }
 
@@ -106,41 +107,35 @@ public class ItemsListFragment extends Fragment {
         public boolean onActionItemClicked(android.support.v7.view.ActionMode actionMode, MenuItem menuItem) {
             if (menuItem.getItemId() == R.id.action_delete) {
                 //проходимся по всему списку, если элемент присутствует в MultiSelector, удаляем его
-                for (int i = listWorkItems.size(); i >=0; i--) {
+                final ArrayList<WorkItem> deletingList = new ArrayList<>();
+                final ArrayList<Integer> deletingIndexesList = new ArrayList<>();
+                for (int i = listWorkItems.size(); i >= 0; i--) {
                     if (mMultiSelector.isSelected(i, 0)) {
-
-                        final WorkItem item = listWorkItems.get(i);
-//TODO:удалить еще и из базы и вообще навсегда
-                        final int finalI = i;
-
-                        Runnable runnable = new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
-                                    workItemDao.delete(item);
-
-                                    Message msg = new Message();
-                                    Bundle bundle = new Bundle();
-                                    bundle.putInt(INDEX, finalI);
-                                    msg.setData(bundle);
-                                    //deletingHandler.sendMessage(msg);
-
-                                } catch (SQLException e) {
-                                    e.printStackTrace();
-                                    //предупредим пользователя, что добавление не состоялось
-                                    Toast.makeText(getContext(), R.string.warningAddFailed, Toast.LENGTH_SHORT).show();
-                                }
-                            }
-                        };
-
-                        Thread thread = new Thread(runnable);
-                        thread.start();
-
+                        deletingList.add(listWorkItems.get(i));
                         listWorkItems.remove(i);
-                        adapter.notifyItemRemoved(i);
                     }
                 }
+
+                Runnable runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Dao<WorkItem, Integer> workItemDao = getHelper().getWorkItemDao();
+                            workItemDao.delete(deletingList);
+
+                            deletingHandler.sendMessage(new Message());
+
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                            //предупредим пользователя, что добавление не состоялось
+                            Toast.makeText(getContext(), R.string.warningDeleteFailed, Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                };
+
+                Thread thread = new Thread(runnable);
+                thread.start();
+
                 actionMode.finish();
                 return true;
             }
