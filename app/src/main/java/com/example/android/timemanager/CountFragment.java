@@ -58,6 +58,8 @@ public class CountFragment extends Fragment implements DatePickerDialog.OnDateSe
         pricePerHour = loadPrefs();
         dateBeginning = Calendar.getInstance();
         dateBeginning.set(Calendar.MONTH, dateBeginning.get(Calendar.MONTH)-1);
+        dateBeginning.set(Calendar.HOUR_OF_DAY, 0);
+        dateBeginning.set(Calendar.MINUTE, 0);
 
         dateEnding = Calendar.getInstance();
 
